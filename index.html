@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Voice Gender Detection</title>
+</head>
+<body>
+  <h2>🎤 Voice Gender Detector</h2>
+  <button onclick="startRecording()">Start Recording</button>
+  <p id="result">Result will appear here...</p>
+
+  <script>
+    let audioContext, analyser, micStream;
+
+    async function startRecording() {
+      const resultEl = document.getElementById("result");
+      resultEl.textContent = "Listening...";
+
+      audioContext = new (window.AudioContext || window.webkitAudioContext)();
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      micStream = audioContext.createMediaStreamSource(stream);
+      analyser = audioContext.createAnalyser();
+      analyser.fftSize = 2048;
+
+      micStream.connect(analyser);
+
+      const bufferLength = analyser.fftSize;
+      const dataArray = new Float32Array(bufferLength);
+
+      const detectPitch = () => {
+        analyser.getFloatTimeDomainData(dataArray);
+
+        // Auto-correlation
+        let bestOffset = -1, bestCorrelation = 0;
+        const sampleRate = audioContext.sampleRate;
+        for (let offset = 20; offset < 1000; offset++) {
+          let correlation = 0;
+          for (let i = 0; i < bufferLength - offset; i++) {
+            correlation += dataArray[i] * dataArray[i + offset];
+          }
+          if (correlation > bestCorrelation) {
+            bestCorrelation = correlation;
+            bestOffset = offset;
+          }
+        }
+
+        if (bestOffset !== -1) {
+          const pitch = sampleRate / bestOffset;
+          console.log("Pitch:", pitch);
+
+          if (pitch > 85 && pitch < 180) {
+            resultEl.textContent = "🧔 Detected: MALE voice (Pitch: " + Math.round(pitch) + " Hz)";
+          } else if (pitch > 180 && pitch < 300) {
+            resultEl.textContent = "👩 Detected: FEMALE voice (Pitch: " + Math.round(pitch) + " Hz)";
+          } else {
+            resultEl.textContent = "🤷 Unable to determine (Pitch: " + Math.round(pitch) + " Hz)";
+          }
+        } else {
+          resultEl.textContent = "🎧 No clear pitch detected.";
+        }
+      };
+
+      setTimeout(detectPitch, 3000); // Listen for 3 seconds then process
+    }
+  </script>
+</body>
+</html>
